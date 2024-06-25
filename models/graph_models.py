@@ -383,17 +383,6 @@ class GraphNetnoSV(nn.Module):
         #return torch.mm(x.view(-1, x_shape[2]), y).view(-1, x_shape[1], y_shape[1])
         return torch.mm(x.reshape(-1, x_shape[2]), y).reshape(-1, x_shape[1], y_shape[1])
 
-class Linear(nn.Module):
-    def __init__(self, n_inputs, n_targets):
-        super(Linear, self).__init__()
-        self.f1 = nn.Linear(n_inputs, n_targets).cuda()
-        self.activation = torch.nn.Sigmoid()
-    def forward(self, x): 
-        x = self.f1(x)
-        return(self.activation(x))
-
-
-
 
 class ParticleNet(nn.Module):
 

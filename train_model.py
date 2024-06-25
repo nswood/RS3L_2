@@ -47,7 +47,8 @@ p.add_args(
     ('--pretrain', p.STORE_TRUE), ('--prepath', p.STR),
     
     # Models
-    ('--trans', p.STORE_TRUE),('--gnn', p.STORE_TRUE),
+    ('--trans', p.STORE_TRUE),('--dnn', p.STORE_TRUE),('--gnv2', p.STORE_TRUE),
+    ('--gnv2_no_sv', p.STORE_TRUE),('--pnet', p.STORE_TRUE),('--pnet_tagger', p.STORE_TRUE),
     
     # Transformer specific parameters
     ('--class_att', p.STORE_TRUE),('--num_encoders', p.INT),('--num_attention_heads', p.INT),('--n_out_nodes',p.INT),
@@ -112,13 +113,28 @@ def load_data():
 def load_model():
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters())
-    if args.gnn:
-        from models import gnn
-        model = gnn.gnn(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain, learnable = args.learnable)
-    elif args.trans:
-        from models import trans
-        model = trans.trans(args,args.mname,_softmax,_sigmoid,pretrain = args.pretrain, learnable = args.learnable)
-        
+    
+   
+    if args.trans:
+        from models.transformer import trans
+        model = trans(args,args.mname,_softmax,_sigmoid,pretrain = args.pretrain)
+    elif args.gnv2:
+        from models.graph_models import gnv2
+        model = gnv2(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+    elif args.gnv2_no_sv:
+        from models.graph_models import gnv2_no_sv
+        model = gnv2_no_sv(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+    elif args.pnet:
+        from models.graph_models import pnet
+        model = pnet(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+    elif args.pnet_tagger:
+        from models.graph_models import pnet_tagger
+        model = pnet(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+    elif args.dnn:
+        from models.dnn import DNN
+        model = DNN(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+
+            
     num_params = count_parameters(model)
     return model,num_params
 
@@ -148,9 +164,6 @@ def load_train_objs():
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = args.nepochs, eta_min=eta_min)
     
     return model,num_params, optimizer,scheduler
-
-
-
 
 
 def main(save_every: int, total_epochs: int, batch_size: int):
