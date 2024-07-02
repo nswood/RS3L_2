@@ -38,7 +38,11 @@ p.add_args(
     
     # Training parameters
     ('--nepochs', p.INT),('--batchsize', p.INT),('--dropout_rate', p.FLOAT),('--lr', {'type': float}),('--weight_init', {'type': float}),
-    ('--num_max_files', p.INT),('--num_max_particles', p.INT), ('--nparts', p.INT),('--nclasses',p.INT),('--feature_size', p.INT),
+    
+    # Data Characteristics
+    ('--num_max_particles', p.INT),('--num_max_files', p.INT),
+    ('--nparts', p.INT),('--nclasses',p.INT),
+    ('--part_feature_size', p.INT),('--jet_feature_size', p.INT),#('--feature_sv_size', p.INT),
     
     # Continue training
     ('--mpath', p.STR), ('--continue_training', p.STORE_TRUE),
@@ -50,9 +54,13 @@ p.add_args(
     ('--trans', p.STORE_TRUE),('--dnn', p.STORE_TRUE),('--gnv2', p.STORE_TRUE),
     ('--gnv2_no_sv', p.STORE_TRUE),('--pnet', p.STORE_TRUE),('--pnet_tagger', p.STORE_TRUE),
     
+    # Model parameters
+    ('--dropout', {'type': float}),
     # Transformer specific parameters
     ('--class_att', p.STORE_TRUE),('--num_encoders', p.INT),('--num_attention_heads', p.INT),('--n_out_nodes',p.INT),
     
+    # Graph specific parameters
+    ('--hidden_size',p.INT),('--De',p.INT),('--Do',p.INT),('--graph_attention',p.STORE_TRUE),('--event_branch',p.STORE_TRUE),
     )
 
 #DDP Configs
@@ -98,10 +106,18 @@ def ddp_setup():
 def load_data():
     from dataloaders.all_data_loader import zpr_loader
     
+    '''
+    
+    Update with path to data
+    
+    '''
+    
     data_train = zpr_loader(None,None,maxfiles=args.num_max_files,pf_size = args.feature_size, max_num_particles = args.nparts)
     train_sampler = torch.utils.data.distributed.DistributedSampler(data_train, shuffle=True)
     train_loader = DataLoader(data_train, batch_size=args.batchsize,shuffle=(train_sampler is None),
         sampler=train_sampler)
+    
+    
     
     data_val = zpr_loader(None,None,maxfiles=args.num_max_files,equal_qcd=args.equal_qcd, max_num_particles = args.nparts)
     val_sampler = torch.utils.data.distributed.DistributedSampler(data_val, shuffle=True)
@@ -114,26 +130,73 @@ def load_model():
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters())
     
-   
     if args.trans:
         from models.transformer import trans
-        model = trans(args,args.mname,_softmax,_sigmoid,pretrain = args.pretrain)
+        model = trans(args, args.mname, _softmax, _sigmoid, pretrain=args.pretrain)
     elif args.gnv2:
-        from models.graph_models import gnv2
-        model = gnv2(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+        from models.graph_models import GraphNetv2
+        model = GraphNetv2(
+            name=args.mname,
+            n_constituents=args.num_max_particles,
+            n_targets=args.nclasses,
+            params=args.part_feature_size,
+#             params_v=args.feature_sv_size,
+            event_branch=args.event_branch,
+            hidden=args.hidden_size,
+            De=args.De,
+            Do=args.Do,
+            dropout=args.dropout_rate,
+            softmax=_softmax,
+            sigmoid=_sigmoid,
+            attention_flag=args.graph_attention
+        )
     elif args.gnv2_no_sv:
-        from models.graph_models import gnv2_no_sv
-        model = gnv2_no_sv(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+        from models.graph_models import GraphNetnoSV
+        model = GraphNetnoSV(
+            name=args.mname,
+            n_constituents=args.num_max_particles,
+            n_targets=args.nclasses,
+            params=args.part_feature_size,
+            hidden=args.hidden_size,
+            De=args.De,
+            Do=args.Do,
+            softmax=_softmax
+        )
     elif args.pnet:
-        from models.graph_models import pnet
-        model = pnet(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+        from models.graph_models import ParticleNet
+        model = ParticleNet(
+            input_dims=args.part_feature_size,
+            num_classes=args.nclasses,
+            conv_params=[(7, (32, 32, 32)), (7, (64, 64, 64))],
+            fc_params=[(128, 0.1)],
+            use_fusion=True,
+            use_fts_bn=True,
+            use_counts=True,
+            for_inference=False,
+            sigmoid=_sigmoid
+        )
     elif args.pnet_tagger:
-        from models.graph_models import pnet_tagger
-        model = pnet(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
+        from models.graph_models import ParticleNetTagger
+        model = ParticleNetTagger(
+            name=args.mname,
+            pf_features_dims=args.part_feature_size,
+#             sv_features_dims=args.feature_sv_size,
+            num_classes=args.nclasses,
+            conv_params=[(7, (32, 32, 32)), (7, (64, 64, 64))],
+            fc_params=[(128, 0.1)],
+            use_fusion=True,
+            use_fts_bn=True,
+            use_counts=True,
+            for_inference=False,
+            sigmoid=_sigmoid
+        )
     elif args.dnn:
         from models.dnn import DNN
-        model = DNN(args,args.mname,_softmax,_sigmoid, pretrain = args.pretrain)
-
+        model = DNN(
+            name=args.mname,
+            n_inputs=args.part_feature_size,
+            n_targets=args.nclasses
+        )
             
     num_params = count_parameters(model)
     return model,num_params
@@ -170,10 +233,10 @@ def main(save_every: int, total_epochs: int, batch_size: int):
     ddp_setup()
     torch.set_default_dtype(torch.float64)
     
-    train_loader, val_loader = load_data()
-    
     model,num_params, optimizer,scheduler = load_train_objs()
     model.double()
+    
+#     train_loader, val_loader = load_data()
     outdir = f"./{args.opath}/{model.name.replace(' ','_')}"
 
     outdir = utils.makedir(outdir,args.continue_training)
@@ -185,7 +248,9 @@ def main(save_every: int, total_epochs: int, batch_size: int):
     with open(os.path.join(outdir,'train_size.txt'), "w") as file:
         file.write(str(len(train_loader.dataset)))
     
-    trainer = Trainer(model, train_loader,val_loader, optimizer, save_every,outdir,total_epochs, args,scheduler)
+#     trainer = Trainer(model, train_loader,val_loader, optimizer, save_every,outdir,total_epochs, args,scheduler)
+    trainer = Trainer(model, None,None, optimizer, save_every,outdir,total_epochs, args,scheduler)
+
     trainer.train(total_epochs)
   
 if __name__ == "__main__":
