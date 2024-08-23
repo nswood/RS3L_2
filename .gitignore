@@ -1,0 +1,9 @@
+#Ignore __pycache__ directories
+__pycache__/
+
+# Ignore all __init__.py files
+__init__.py
+
+# Ignore all slurm monitoring
+slurm_monitoring/
+

@@ -46,8 +46,6 @@ class Transformer(nn.Module):
         self.input_bn = nn.BatchNorm1d(config.feature_size)
         self.pretrain = pretrain
         self.hybrid = config.hybrid
-        if config.hyperbolic:
-            self.c = config.c
         
         self.embedder = nn.Linear(config.feature_size, config.embedding_size)
         if sv_branch: 
@@ -107,8 +105,6 @@ class Transformer(nn.Module):
         size = config.nparts
         if config.sv:
             size = size + 5
-        if config.hyperbolic:
-                self.PtoE =hypnn.FromPoincare(config.c)
         if config.replace_mean:  
             self.pre_final = nn.ModuleList([
                                                nn.Linear(int(size), int(size/2)),
@@ -229,9 +225,6 @@ class Transformer(nn.Module):
             for e in self.encoders_sv:
             #print(h,attn_mask,head_mask)
             	h = e(h, attn_sv_mask, head_mask)[0]
-#             if self.config.hyperbolic:
-#                 h = torch.squeeze(h, dim= 1)
-#                 h = hypnn.ToPoincare(self.c)(h)
             h = self.decoders_sv[0](h)
             h = self.relu(h)
             h = self.decoder_bn_sv[0](h.permute(0, 2, 1)).permute(0, 2, 1)
@@ -276,9 +269,6 @@ class Transformer(nn.Module):
             for e in self.encoders:
             #print(h,attn_mask,head_mask)
             	h = e(h, attn_mask, head_mask)[0]
-#             if self.config.hyperbolic:
-#                 h = torch.squeeze(h, dim= 1)
-#                 h = hypnn.ToPoincare(self.c)(h)
             h = self.decoders[0](h)
             h = self.relu(h)
             h = self.decoder_bn[0](h.permute(0, 2, 1)).permute(0, 2, 1)

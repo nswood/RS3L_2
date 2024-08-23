@@ -1,21 +1,21 @@
 #!/bin/bash
 #SBATCH --job-name=trans
-#SBATCH --partition=gpu
-#SBATCH --time=48:00:00
+#SBATCH --partition=gpu_test
+#SBATCH --time=1:00:00
 
 ### e.g. request 4 nodes with 1 gpu each, totally 4 gpus (WORLD_SIZE==4)
 ### Note: --gres=gpu:x should equal to ntasks-per-node
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=2
-#SBATCH --gres=gpu:2
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=200G
-#SBATCH --chdir=/n/home11/nswood/NonE_AD/
+#SBATCH --chdir=/n/home11/nswood/RS3L_2/
 #SBATCH --output=slurm_monitoring/%x-%j.out
 
 ### change 5-digit MASTER_PORT as you wish, slurm will raise Error if duplicated with others
 ### change WORLD_SIZE as gpus/node * num_nodes
-export MASTER_PORT=9195
+export MASTER_PORT=5323
 export WORLD_SIZE=2
 
 ### get the first node name as master address - customized for vgg slurm
@@ -39,3 +39,4 @@ conda activate flat-samples
 
 ### the command to run 
 
+python train_model.py --temperature 0.1 --nepochs 10 --batchsize 250 --dropout_rate 0.2 --lr 0.0001 --nparts 100 --nclasses 2 --feature_size 10 --trans --class_att --num_encoders 4 --num_attention_heads 4

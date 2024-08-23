@@ -28,7 +28,7 @@ class GraphNetv2(nn.Module):
         self.P = params
         self.name = name
         self.is_oldmodel = is_oldmodel
-        self.Nv = n_vertices		
+        self.Nv = n_vertices
         self.N = n_constituents
         self.S = params_v
         self.E = params_e
@@ -242,6 +242,7 @@ class GraphNetv2(nn.Module):
         #return torch.mm(x.view(-1, x_shape[2]), y).view(-1, x_shape[1], y_shape[1])
         return torch.mm(x.reshape(-1, x_shape[2]), y).reshape(-1, x_shape[1], y_shape[1])
 
+    
 class GraphNetnoSV(nn.Module):
     def __init__(self, name, n_constituents, n_targets, params, hidden, De=5, Do=6, softmax=False):
         super(GraphNetnoSV, self).__init__()
@@ -276,17 +277,6 @@ class GraphNetnoSV(nn.Module):
         self.fo1 = nn.Linear(self.P + self.Dx + (self.De), self.hidden)
         self.fo2 = nn.Linear(self.hidden, int(self.hidden/2))
         self.fo3 = nn.Linear(int(self.hidden/2), self.Do)
-
-        #self.fr1 = nn.DataParallel(self.fr1)        
-        #self.fr2 = nn.DataParallel(self.fr2)        
-        #self.fr3 = nn.DataParallel(self.fr3)
-        #self.fr1_pv = nn.DataParallel(self.fr1_pv)        
-        #self.fr2_pv = nn.DataParallel(self.fr2_pv)        
-        #self.fr3_pv = nn.DataParallel(self.fr3_pv) 
-        #self.fo1 = nn.DataParallel(self.fo1) 
-        #self.fo2 = nn.DataParallel(self.fo2) 
-        #self.fo3 = nn.DataParallel(self.fo3) 
-
         
         self.fc_fixed1 = nn.Linear(self.Do, 5*(self.n_targets))
         self.fc_fixed2 = nn.Linear(5*self.n_targets, 3*self.n_targets)
